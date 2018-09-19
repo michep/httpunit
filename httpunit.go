@@ -251,10 +251,13 @@ var Timeout = time.Second * 10
 
 // TestPlan describes a test and its permutations (IP addresses).
 type TestPlan struct {
-	Label string
-	URL   string
-	IPs   []string
-	Tags  []string
+	Label       string
+	URL         string
+	Method      string
+	PostData    string
+	ContentType string
+	IPs         []string
+	Tags        []string
 
 	Code    int
 	Text    string
@@ -486,7 +489,15 @@ func (c *TestCase) testHTTP() (r *TestResult) {
 		},
 		DisableKeepAlives: true,
 	}
-	req, err := http.NewRequest("GET", c.URL.String(), nil)
+	var err error
+	var req *http.Request
+	switch {
+	case c.Plan.Method == "" || c.Plan.Method == "GET":
+		req, err = http.NewRequest("GET", c.URL.String(), nil)
+	case c.Plan.Method == "POST":
+		req, err = http.NewRequest("POST", c.URL.String(), strings.NewReader(c.Plan.PostData))
+		req.Header.Add("Content-Type", c.Plan.ContentType)
+	}
 	if err != nil {
 		r.Result = err
 		return
@@ -527,9 +538,9 @@ func (c *TestCase) testHTTP() (r *TestResult) {
 		return
 	}
 	short := text
-	if len(short) > 250 {
-		short = short[:250]
-	}
+	// if len(short) > 250 {
+	// 	short = short[:250]
+	// }
 	if c.ExpectText != "" && !strings.Contains(string(text), c.ExpectText) {
 		r.Result = fmt.Errorf("response does not contain text [%s]: %q", c.ExpectText, short)
 	} else {
