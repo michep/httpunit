@@ -254,6 +254,7 @@ type TestPlan struct {
 	Label       string
 	URL         string
 	Method      string
+	Proxy       string
 	PostData    string
 	ContentType string
 	IPs         []string
@@ -480,15 +481,23 @@ func (c *TestCase) testHTTP() (r *TestResult) {
 		r.TimeTotal = time.Now().Sub(t)
 	}()
 	tr := &http.Transport{
-		Dial: func(network, a string) (net.Conn, error) {
-			conn, err := net.DialTimeout(network, c.addr(), c.Timeout)
-			if err != nil {
-				r.Connected = false
-			}
-			return conn, err
-		},
+		DialContext: (&net.Dialer{
+			Timeout:   c.Timeout,
+			KeepAlive: c.Timeout,
+			DualStack: true,
+		}).DialContext,
 		DisableKeepAlives: true,
 	}
+
+	if c.Plan.Proxy != "" {
+		proxyurl, err := url.Parse(c.Plan.Proxy)
+		if err != nil {
+			r.Result = err
+			return
+		}
+		tr.Proxy = http.ProxyURL(proxyurl)
+	}
+
 	var err error
 	var req *http.Request
 	switch {
